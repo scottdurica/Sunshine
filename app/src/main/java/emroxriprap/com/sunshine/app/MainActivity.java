@@ -3,42 +3,79 @@ package emroxriprap.com.sunshine.app;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
-import android.support.v4.app.Fragment;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
 
 
-public class MainActivity extends ActionBarActivity {
-     private final String LOG_TAG = MainActivity.class.getSimpleName();
+public class MainActivity extends ActionBarActivity implements ForecastFragment.Callback{
+    private final String LOG_TAG = MainActivity.class.getSimpleName();
+    private static final String DETAILFRAGMENT_TAG = "DFTAG";
+    private boolean mTwoPane;
+    private String mLocation;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mLocation = Utility.getPreferredLocation(this);
         setContentView(R.layout.activity_main);
-        if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .add(R.id.container, new ForecastFragment())
-                    .commit();
+        if (findViewById(R.id.weather_detail_container) != null){
+            //detail container is present in view...must be tablet
+            mTwoPane = true;
+            if (savedInstanceState == null){
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.weather_detail_container,new DetailFragment(),
+                                DETAILFRAGMENT_TAG).commit();
+            }
+        }else{
+            mTwoPane = false;
+            getSupportActionBar().setElevation(0f);
         }
+        ForecastFragment forecastFragment = ((ForecastFragment)getSupportFragmentManager().
+                         findFragmentById(R.id.fragment_forecast));
+        forecastFragment.setmUseTodayLayout(!mTwoPane);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        String location = Utility.getPreferredLocation(this);
+        //updat the location in our second pane using the fragmentmanager
+        if (location != null && !location.equals(mLocation)){
+            ForecastFragment ff = (ForecastFragment)getSupportFragmentManager().
+                    findFragmentById(R.id.fragment_forecast);
+            if (ff != null){
+                ff.onLocationChanged();
+            }
+            DetailFragment df = (DetailFragment)getSupportFragmentManager().findFragmentByTag(DETAILFRAGMENT_TAG);
+            if (df != null){
+                df.onLocationChanged(location);
+            }
+            mLocation = location;
+        }
+    }
+    @Override
+    public void onItemSelected(Uri contentUri) {
+        if (mTwoPane){
+            //in two-pane mode, show the detail view in this acivity by
+            //adding or replacing the detail fragment using a fragmenttransaction
+            Bundle args = new Bundle();
+            args.putParcelable(DetailFragment.DETAIL_URI,contentUri);
 
+
+            DetailFragment fragment = new DetailFragment();
+            fragment.setArguments(args);
+
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.weather_detail_container,fragment,DETAILFRAGMENT_TAG)
+                    .commit();
+        }else{
+            Intent intent = new Intent(this,DetailActivity.class).setData(contentUri);
+            startActivity(intent);
+        }
+    }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -81,6 +118,7 @@ public class MainActivity extends ActionBarActivity {
             Log.d(LOG_TAG, "Couldn't call "+ location + ", no app");
         }
     }
+
 
 }
 
